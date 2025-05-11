@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warning Sign Analysis System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .upload-section {
+            text-align: center;
+            margin-bottom: 20px;
+            padding: 40px;
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            background-color: #fafafa;
+            transition: all 0.3s ease;
+        }
+        .upload-section.dragover {
+            background-color: #e9ecef;
+            border-color: #007bff;
+        }
+        .result-section {
+            margin-top: 20px;
+            display: none;
+        }
+        .result-image {
+            max-width: 100%;
+            margin-top: 20px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .result-info {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .upload-btn {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        .upload-btn:hover {
+            background-color: #0056b3;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .error {
+            color: red;
+            margin-top: 10px;
+            display: none;
+        }
+        .drop-text {
+            color: #666;
+            margin: 10px 0;
+        }
+        .file-name {
+            margin-top: 10px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Warning Sign Analysis System</h1>
+        
+        <div class="upload-section" id="dropZone">
+            <input type="file" id="imageInput" accept="image/*" style="display: none;">
+            <button class="upload-btn" onclick="document.getElementById('imageInput').click()">
+                Choose Image
+            </button>
+            <p class="drop-text">or drag and drop an image here</p>
+            <p class="file-name" id="fileName"></p>
+        </div>
+
+        <div class="loading" id="loading">
+            Analyzing...
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="result-section" id="resultSection">
+            <h2>Analysis Results</h2>
+            <div class="result-info" id="resultInfo"></div>
+            <img class="result-image" id="resultImage" src="" alt="Analysis Result">
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const imageInput = document.getElementById('imageInput');
+        const fileName = document.getElementById('fileName');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const resultSection = document.getElementById('resultSection');
+        const resultInfo = document.getElementById('resultInfo');
+        const resultImage = document.getElementById('resultImage');
+
+        // Drag and drop handlers
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('dragover');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleFile(file);
+            }
+        }
+
+        imageInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handleFile(file);
+            }
+        });
+
+        function handleFile(file) {
+            fileName.textContent = `Selected: ${file.name}`;
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            resultSection.style.display = 'none';
+
+            const formData = new FormData();
+            formData.append('image', file);
+
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => {
+                        throw new Error(err.error || 'Server error');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                loading.style.display = 'none';
+                resultSection.style.display = 'block';
+                
+                if (data.success) {
+                    const result = data.result;
+                    let resultHtml = '';
+                    
+                    if (result.message) {
+                        resultHtml = `<p>${result.message}</p>`;
+                    } else {
+                        resultHtml = `
+                            <p>Detected Sign: ${result.class_name}</p>
+                            <p>Saliency Score: ${result.saliency_score.toFixed(2)}</p>
+                            <p>Location Reasonable: ${result.is_reasonable ? 'Yes' : 'No'}</p>
+                        `;
+                    }
+                    
+                    resultInfo.innerHTML = resultHtml;
+                    if (result.image) {
+                        resultImage.src = `data:image/jpeg;base64,${result.image}`;
+                    } else {
+                        error.style.display = 'block';
+                        error.textContent = 'No image data received';
+                    }
+                }
+            })
+            .catch(error => {
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = 'Error: ' + error.message;
+            });
+        }
+    </script>
+</body>
+</html> 
