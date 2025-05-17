@@ -1,3 +1,24 @@
+# 大文件
 ASNet.h5
 yolov8l.pt
-yolov8l.pt
+*.h5
+*.pt
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虚拟环境
+venv/
+env/
+.env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# 其他
+*.log
+.DS_Store
