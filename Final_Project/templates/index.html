@@ -191,11 +191,7 @@
                     if (result.message) {
                         resultHtml = `<p>${result.message}</p>`;
                     } else {
-                        resultHtml = `
-                            <p>Detected Sign: ${result.class_name}</p>
-                            <p>Saliency Score: ${result.saliency_score.toFixed(2)}</p>
-                            <p>Location Reasonable: ${result.is_reasonable ? 'Yes' : 'No'}</p>
-                        `;
+                        resultHtml = `<p>Saliency Detection Visualization</p>`;
                     }
                     
                     resultInfo.innerHTML = resultHtml;

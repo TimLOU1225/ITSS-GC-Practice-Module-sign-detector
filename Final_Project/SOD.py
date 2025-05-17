@@ -151,24 +151,22 @@ class WarningSignAnalyzer:
                         'is_reasonable': is_reasonable
                     }
         
-        return None
+        # 检测不到时兜底返回
+        return {
+            'class_name': 'No warning sign detected',
+            'position': None,
+            'saliency_score': None,
+            'is_reasonable': None
+        }
 
     def visualize_results(self, image_path, result):
-        # 读取原始图像
         img = cv2.imread(image_path)
-        
-        if result:
+        if result and result['position'] is not None:
             x1, y1, x2, y2 = result['position']
-            # 根据合理性选择颜色
             color = (0, 255, 0) if result['is_reasonable'] else (0, 0, 255)
-            
-            # 绘制边界框
             cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
-            
-            # 添加文本说明
             text = f"{result['class_name']} ({result['saliency_score']:.2f})"
             cv2.putText(img, text, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        
         return img
 
 def process_directory(input_dir, output_dir):
@@ -203,6 +201,16 @@ def process_directory(input_dir, output_dir):
             print(f"结果已保存到: {output_path}")
         else:
             print("未检测到警告标识")
+
+    # 所有处理逻辑完成后，再删除文件
+    try:
+        if os.path.exists(image_path):
+            try:
+                os.remove(image_path)
+            except Exception as e:
+                print(f"Error removing file: {str(e)}")
+    except Exception as e:
+        print(f"Error removing file: {str(e)}")
 
 def main():
     # 设置输入输出路径

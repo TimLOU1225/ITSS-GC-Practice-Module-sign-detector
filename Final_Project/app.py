@@ -80,7 +80,10 @@ def analyze():
         
         try:
             # Analyze image
-            result, saliency_map = analyzer.analyze_image(filepath)
+            result_tuple = analyzer.analyze_image(filepath)
+            if not isinstance(result_tuple, tuple) or len(result_tuple) != 2:
+                raise ValueError("analyze_image did not return a (result, saliency_map) tuple")
+            result, saliency_map = result_tuple
             
             if result:
                 # Visualize results
