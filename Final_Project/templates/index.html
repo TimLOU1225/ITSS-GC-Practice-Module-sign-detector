@@ -166,7 +166,7 @@
             resultSection.style.display = 'none';
 
             const formData = new FormData();
-            formData.append('image', file);
+            formData.append('file', file);
 
             fetch('/analyze', {
                 method: 'POST',

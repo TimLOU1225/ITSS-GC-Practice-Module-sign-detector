@@ -147,27 +147,63 @@ class WarningSignAnalyzer:
                     return {
                         'class_name': class_name,
                         'position': (x1, y1, x2, y2),
-                        'saliency_score': avg_saliency,
-                        'is_reasonable': is_reasonable
-                    }
+                        'saliency_score': float(avg_saliency),
+                        'is_reasonable': bool(is_reasonable),
+                        'confidence': float(box.conf[0]),
+                        'source': 'yolo'
+                    }, saliency_map
         
         # 检测不到时兜底返回
+        height, width = original_image.shape[:2]
         return {
             'class_name': 'No warning sign detected',
-            'position': None,
-            'saliency_score': None,
-            'is_reasonable': None
-        }
+            'position': (0, 0, width, height),
+            'saliency_score': 0.0,
+            'is_reasonable': False,
+            'confidence': 0.0,
+            'source': 'none'
+        }, saliency_map
 
-    def visualize_results(self, image_path, result):
+    def visualize_results(self, image_path, result, saliency_map=None):
+        # 读取原始图像
         img = cv2.imread(image_path)
-        if result and result['position'] is not None:
+        if img is None:
+            raise ValueError("无法读取图片")
+        
+        # 确保显著性图与原始图像尺寸相同
+        if saliency_map is not None:
+            saliency_map = cv2.resize(saliency_map, (img.shape[1], img.shape[0]))
+            saliency_map = 1 - saliency_map  # 反转，使红色代表显著性高
+        
+        # 创建三栏画布
+        height, width = img.shape[:2]
+        canvas = np.zeros((height, width * 3, 3), dtype=np.uint8)
+        canvas[:, :width] = img  # 原图
+        canvas[:, width:width*2] = cv2.applyColorMap(
+            (saliency_map * 255).astype(np.uint8), 
+            cv2.COLORMAP_JET
+        )  # 只显示热力图
+        overlay = cv2.addWeighted(img, 0.7, cv2.applyColorMap(
+            (saliency_map * 255).astype(np.uint8), 
+            cv2.COLORMAP_JET
+        ), 0.3, 0)
+        canvas[:, width*2:] = overlay  # 混合图
+        
+        if result:
             x1, y1, x2, y2 = result['position']
+            # 在两个图像上都绘制边界框
             color = (0, 255, 0) if result['is_reasonable'] else (0, 0, 255)
-            cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
+            
+            # 在原始图像上绘制
+            cv2.rectangle(canvas, (x1, y1), (x2, y2), color, 2)
             text = f"{result['class_name']} ({result['saliency_score']:.2f})"
-            cv2.putText(img, text, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
-        return img
+            cv2.putText(canvas, text, (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            
+            # 在显著性图上绘制
+            cv2.rectangle(canvas, (x1 + width, y1), (x2 + width, y2), color, 2)
+            cv2.putText(canvas, text, (x1 + width, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        
+        return canvas
 
 def process_directory(input_dir, output_dir):
     # 创建分析器实例
@@ -185,15 +221,15 @@ def process_directory(input_dir, output_dir):
         print(f"处理图片: {image_file}")
         
         # 分析图片
-        result = analyzer.analyze_image(image_path)
+        result, saliency_map = analyzer.analyze_image(image_path)
         
-        if result:
+        if result['class_name'] != 'No warning sign detected':
             print(f"检测到警告标识: {result['class_name']}")
             print(f"显著性得分: {result['saliency_score']:.2f}")
             print(f"位置是否合理: {'是' if result['is_reasonable'] else '否'}")
             
             # 可视化结果
-            result_img = analyzer.visualize_results(image_path, result)
+            result_img = analyzer.visualize_results(image_path, result, saliency_map)
             
             # 保存结果
             output_path = os.path.join(output_dir, f"result_{image_file}")
@@ -222,5 +258,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
